@@ -1,0 +1,336 @@
+﻿@page "/ListOfProducts"
+@using Microsoft.AspNetCore.Mvc;
+@using Models
+@using System.Drawing
+
+
+@code {
+
+    public AdventureWorks2019Context db = new AdventureWorks2019Context();
+
+    private List<Product> products = new List<Product>();
+
+    private List<Product> allProducts = new List<Product>();
+
+    int numberOfButtons;
+
+    public int Page { get; set; }
+
+    public List<int> PageNumbers { get; set; } = new List<int>();
+
+    public List<int?> Subcategories { get; set; } = new List<int?>();
+
+    public List<decimal> StandardCosts { get; set; } = new List<decimal>();
+
+    public List<int> VisiblePageNumbers { get; set; } = new List<int>();
+
+    public int SelectedSubcategoryValue { get; set; } 
+
+    public string? IfNameContains { get; set; } 
+
+    public string? IfProductNumberContains { get; set; }
+
+    decimal StandardCostFrom { get; set; } = 0;
+
+    decimal StandardCostTo { get; set; } = 2171;
+
+
+
+    protected override void OnInitialized()
+    {
+
+        OnPageSelected(0);
+
+        AddSubcategoriesToDropdown();
+
+        AddStandardCostsList();
+
+    }
+
+    public void AddSubcategoriesToDropdown()
+    {
+        allProducts = db.Products.OrderBy(x => x.ProductId).ToList();
+
+        foreach (var product in allProducts)
+        {
+            if (!Subcategories.Contains(Convert.ToInt32(product.ProductSubcategoryId)))
+            {
+                Subcategories.Add(Convert.ToInt32(product.ProductSubcategoryId));
+            }
+
+        }
+
+        Subcategories.Sort();
+        Subcategories[0] = null;
+    }
+
+    public void AddStandardCostsList()
+    {
+        allProducts = db.Products.OrderBy(x => x.ProductId).ToList();
+
+        foreach (var product in allProducts)
+        {
+            if (!StandardCosts.Contains((product.StandardCost)))
+            {
+                StandardCosts.Add((product.StandardCost));
+            }
+
+        }
+    }
+
+    public void HandleIfNameContainsChange(ChangeEventArgs e)
+    {
+        IfNameContains = e.Value?.ToString();
+        OnPageSelected(0); 
+    }
+
+    public void HandleIfProductNumberContainsChange(ChangeEventArgs e)
+    {
+        IfProductNumberContains = e.Value?.ToString();
+        OnPageSelected(0);
+    }
+
+
+
+    public void OnPageSelected(int page)
+    {
+        Page = page;
+
+        IEnumerable<Product> query = db.Products;
+
+
+        if (IfNameContains != null)
+        {
+            query = query.Where(x => x.Name.Contains(IfNameContains));
+        }
+
+        if (IfProductNumberContains != null)
+        {
+            query = query.Where(x => x.ProductNumber.Contains(IfProductNumberContains));
+        }
+
+        if(Subcategories.Contains(SelectedSubcategoryValue) && SelectedSubcategoryValue != null)
+        {
+            query = query.Where(x => x.ProductSubcategoryId == SelectedSubcategoryValue);
+        }
+     
+        query = query.Where(x => x.StandardCost >= StandardCostFrom && x.StandardCost <= StandardCostTo);
+
+
+        int selectedValueProducts = query.Count();
+
+        Pagination pagination = new Pagination(selectedValueProducts, 15);
+
+        numberOfButtons = pagination.MaxPage - 1;
+
+        int minPage = Math.Max(Page - 2, 0);
+        int maxPage = Math.Min(Page + 2, numberOfButtons);
+
+        VisiblePageNumbers.Clear();
+
+        for (int i = minPage; i <= maxPage; i++)
+        {
+            VisiblePageNumbers.Add(i);
+        }
+
+
+        products = query.OrderBy(x => x.ProductId).Skip(Page * pagination.PageSize).Take(pagination.PageSize).ToList();
+
+
+    }
+
+    public void HandleStandardCostFromChange(ChangeEventArgs e)
+    {
+        if (decimal.TryParse(e.Value?.ToString(), out decimal value))
+        {
+            StandardCostFrom = value;
+            OnPageSelected(0); // Update the product list based on the filter
+        }
+    }
+
+    public void HandleStandardCostToChange(ChangeEventArgs e)
+    {
+        if (decimal.TryParse(e.Value?.ToString(), out decimal value))
+        {
+            StandardCostTo = value;
+            OnPageSelected(0); // Update the product list based on the filter
+        }
+    }
+
+    
+   
+
+
+    public void PageSelectedMinusOne()
+    {
+        if (Page==0)
+        {
+            Page = 0;      
+        }
+        else
+        {
+            Page--;
+            OnPageSelected(Page);
+        }
+    }
+
+    public void PageSelectedPlusOne()
+    {
+        if (Page == numberOfButtons)
+        {
+            Page = numberOfButtons;
+        }
+        else
+        {
+            Page++;
+            OnPageSelected(Page);
+            
+        }
+    }
+
+}
+
+
+
+
+<head>
+    <PageTitle>List of products</PageTitle>
+
+    <style>
+        
+
+        .button-numbers-active
+        {
+            background: blue;
+        }
+
+        .button-rightAndLeft:active
+        {
+            background: blue;
+            
+        }
+
+        .flex-container 
+        {
+            display: flex;
+           
+            
+        }
+
+        .filtersDivs
+        {
+            
+            padding: 15px;
+        }
+
+        
+    </style>
+
+
+</head>
+
+<body>
+    <h1>Products</h1>
+    <a href="#" ></a>
+
+    <div>
+        
+        <div>
+            <div class="flex-container">
+                <div class="filtersDivs">
+                    <label>Find if Name contains?</label>
+                    <input type="text" @bind="IfNameContains" @oninput="HandleIfNameContainsChange"><br><br>
+                </div>
+                <div class="filtersDivs">
+                    <label>Find if Product number contains?</label>
+                    <input type="text" @bind="IfProductNumberContains" @oninput="HandleIfProductNumberContainsChange"><br><br>
+                </div>
+                <div class="filtersDivs">
+                    <label>Choose a subcategory:</label>
+                    <select class="subcategory" @bind="SelectedSubcategoryValue" @onclick="() => OnPageSelected(0)">
+                        @foreach (var subcategory in Subcategories)
+                        {
+                            <option>@subcategory</option>
+                        }
+                    </select>
+                </div>
+                <div class="filtersDivs">
+                    <div class="flex-container">
+                        <label>Standard cost range </label>
+                    </div>
+                    <div class="flex-container">
+                        <div style="margin-right: 10px">
+                            <span>From:</span>
+                            <input type="range" min="0" max=@StandardCosts.Max() step="1" @bind="StandardCostFrom" @oninput="HandleStandardCostFromChange">
+                            <span>@StandardCostFrom</span>
+                        </div>
+                        <div>
+                            <span>To:</span>
+                            <input type="range" min="0" max=@StandardCosts.Max() step="1" @bind="StandardCostTo" @oninput="HandleStandardCostToChange">
+                            <span>@StandardCostTo</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <table class="table" >
+                <thead>
+                    <tr>
+                        <th>Product Id</th>
+                        <th>Product number</th>
+                        <th>Name</th>
+                        <th>Category</th>
+                        <th>Subcategory</th>
+                        <th>Color</th>
+                        <th>Safety stock level</th>
+                        <th>Standard cost</th>
+                        <th>List price</th>
+                        <th>Sell start date</th>
+                        <th>Sell end date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach(var product in products)
+                    {
+                    <tr>
+                        <td>@product.ProductId</td>
+                        <td>@product.ProductNumber</td>
+                        <td>@product.Name</td>
+                        <td>@product.Class</td>
+                        <td>@product.ProductSubcategoryId</td>
+                        <td>@product.Color</td>
+                        <td>@product.SafetyStockLevel</td>
+                        <td>@product.StandardCost</td>
+                        <td>@product.ListPrice</td>
+                        <td>@product.SellStartDate</td>
+                        <td>@product.SellEndDate</td>
+                    </tr>
+                    }
+                </tbody>
+
+
+            </table>
+        </div>
+        <div style="float:left">
+        <button @onclick="() => OnPageSelected(0)">|&lt</button>
+        <button class="button-rightAndLeft" @onclick="() => PageSelectedMinusOne()">&lt</button>
+        @foreach(int pageNumber in VisiblePageNumbers)
+        {
+            
+            @if (pageNumber == Page)
+            {
+                <button class="button-numbers-active">@Page</button>
+            }
+            else
+            {
+                <button class="button-numbers" @onclick="() => OnPageSelected(pageNumber)">@pageNumber</button>
+            }
+        }
+        <button class="button-rightAndLeft" @onclick="() => PageSelectedPlusOne()">&gt</button>
+        <button @onclick="() => OnPageSelected(numberOfButtons)">&gt|</button>
+        </div>
+        <div style="float:right">
+            <p>Number of pages: @numberOfButtons</p>
+        </div>
+    </div>
+</body>
+

@@ -1,0 +1,375 @@
+﻿@page "/ProductionHistory"
+@using MatBlazor
+@using Microsoft.AspNetCore.Mvc;
+@using Models
+@using System.Drawing
+
+
+
+@code {
+    public AdventureWorks2019Context db = new AdventureWorks2019Context();
+
+    private List<TransactionHistory> transactionProducts = new List<TransactionHistory>();
+
+    private List<Product> allProducts = new List<Product>();
+
+    private List<TransactionHistory> allTransactionProducts = new List<TransactionHistory>();
+
+    int numberOfButtons;
+
+    public int Page { get; set; }
+
+    public List<int> PageNumbers { get; set; } = new List<int>();
+
+    public List<string> Subcategories { get; set; } = new List<string>();
+
+    public List<DateTime> TransactionDates { get; set; } = new List<DateTime>();
+
+    public List<int> QuantityList { get; set; } = new List<int>();
+
+    public string SelectedSubcategoryValue { get; set; }
+
+    public int SelectedValue { get; set; }
+
+    public List<int> VisiblePageNumbers { get; set; } = new List<int>();
+
+    public string? TransactionTypeValue { get; set; }
+
+    int? QuantityFromValue { get; set; } 
+
+    int? QuantityToValue { get; set; } 
+
+    private DateTime? _date1 = new DateTime(2013, 7, 31);
+
+    public DateTime? Date1
+    {
+        get => _date1;
+        set
+        {
+            if (_date1 != value)
+            {
+                _date1 = value;
+                OnPageSelected(0); 
+            }
+        }
+    } 
+
+    public DateTime? _date2 { get; set; } = new DateTime(2014, 8, 3);
+
+    public DateTime? Date2
+    {
+        get => _date2;
+        set
+        {
+            if (_date2 != value)
+            {
+                _date2 = value;
+                OnPageSelected(0);
+            }
+        }
+    }
+
+
+
+    protected override void OnInitialized()
+    {
+
+        AddQuantityList();
+
+        AddSubcategoriesToDropdown();
+
+        OnPageSelected(0);
+
+    }
+
+    public void AddSubcategoriesToDropdown()
+    {
+        allTransactionProducts = db.TransactionHistories.OrderBy(x => x.TransactionId).ToList();
+
+        allProducts = db.Products.OrderBy(x => x.ProductId).ToList();
+
+        foreach( var product in allProducts)
+        {
+            foreach (var historyProduct in allTransactionProducts)
+            {
+                if(product.ProductId == historyProduct.ProductId)
+                {
+                    if (!Subcategories.Contains(product.Name))
+
+                        Subcategories.Add((product.Name));
+                }
+            }
+        }
+
+        Subcategories.Sort();
+        Subcategories.Insert(0, null);
+    }
+
+    public void AddQuantityList()
+    {
+
+        allTransactionProducts = db.TransactionHistories.OrderBy(x => x.TransactionId).ToList();
+
+        foreach (var product in allTransactionProducts)
+        {
+            if (!QuantityList.Contains((product.Quantity)))
+            {
+                QuantityList.Add((product.Quantity));
+            }
+        }
+
+        QuantityList.Sort();
+        QuantityFromValue = QuantityList.Min();
+        QuantityToValue = QuantityList.Max();
+
+    }
+
+    public void HandleTransactionTypeValueChange(ChangeEventArgs e)
+    {
+        TransactionTypeValue = e.Value?.ToString();
+        OnPageSelected(0);
+    }
+
+
+
+
+
+    public void OnPageSelected(int page)
+    {
+        Page = page;
+
+        IEnumerable<TransactionHistory> query = db.TransactionHistories;
+
+
+        foreach (var product in allProducts)
+        {
+            if (product.Name == SelectedSubcategoryValue)
+            {
+                SelectedValue = product.ProductId;
+            }
+        }
+
+
+
+        if (TransactionTypeValue != null && TransactionTypeValue != "")
+        {
+            query = query.Where(x => x.TransactionType == TransactionTypeValue);
+        }
+
+
+
+        if (Subcategories.Contains(SelectedSubcategoryValue) && SelectedSubcategoryValue != null)
+        {
+            query = query.Where(x => x.ProductId == SelectedValue);
+        }
+
+
+
+        query = query.Where(x => x.TransactionDate >= Date1 && x.TransactionDate <= Date2);
+
+        query = query.Where(x => x.Quantity >= QuantityFromValue && x.Quantity <= QuantityToValue);
+
+
+        int selectedValueProducts = query.Count();
+
+        Pagination pagination = new Pagination(selectedValueProducts, 15);
+
+        numberOfButtons = pagination.MaxPage - 1;
+
+        int minPage = Math.Max(Page - 2, 0);
+        int maxPage = Math.Min(Page + 2, numberOfButtons);
+
+        VisiblePageNumbers.Clear();
+
+        for (int i = minPage; i <= maxPage; i++)
+        { 
+            VisiblePageNumbers.Add(i);
+        }
+
+        transactionProducts = query.OrderBy(x => x.TransactionId).Skip(Page * pagination.PageSize).Take(pagination.PageSize).ToList();
+
+
+    }
+
+
+    public void PageSelectedMinusOne()
+    {
+        if (Page == 0)
+        {
+            Page = 0;
+        }
+        else
+        {
+            Page--;
+            OnPageSelected(Page);
+        }
+    }
+
+    public void PageSelectedPlusOne()
+    {
+        if (Page == numberOfButtons)
+        {
+            Page = numberOfButtons;
+        }
+        else
+        {
+            Page++;
+            OnPageSelected(Page);
+
+        }
+    }
+
+    }
+
+
+
+
+   <head>
+        <PageTitle>Production history</PageTitle>
+
+        <style>
+
+
+            .button-numbers-active {
+                background: blue;
+            }
+
+            .button-rightAndLeft:active {
+                background: blue;
+            }
+
+            .flex-container {
+                display: flex;
+            }
+
+            .filtersDivs {
+                
+                margin-left: 30px;
+            }
+
+            label {
+                display: block;
+            }
+
+        </style>
+
+   </head>
+
+    <body>
+        <h1>Production history</h1>
+        <a href="#"></a>
+
+        <div>
+            <div class="flex-container">
+                <div>
+                    <label>Transaction date range </label>
+                    <div class="flex-container">
+                        <div class="flex-container">
+                            <span>From:</span>
+                            <p>
+                                <MatDatePicker @bind-Value="@Date1" OnInput="() => OnPageSelected(0)"></MatDatePicker>
+                            </p>
+                        </div>
+                        <div class="flex-container">
+                            <span style="margin-right:20px">To:</span>
+                            <p>
+                                <MatDatePicker @bind-Value="@Date2" OnInput="() => OnPageSelected(0)"></MatDatePicker>
+                            </p>
+                        </div>
+                    </div>
+                    
+                </div>
+                <div class="filtersDivs" style="margin-top: 15px">
+                    <label>Choose a product name:</label>
+                    <select class="subcategory" @bind="SelectedSubcategoryValue" @onclick="() => OnPageSelected(0)">
+                        @foreach (var subcategory in Subcategories)
+                    {
+                        <option>@subcategory</option>
+                    }
+                    </select>
+                </div>
+                <div class="filtersDivs" style="margin-top: 10px">
+                    <label>Choose a transaction type:</label>
+                    <input type="text" @bind="TransactionTypeValue" @oninput="HandleTransactionTypeValueChange"><br><br>
+                </div>
+                <div class="filtersDivs">
+                    <div class="flex-container">
+                        <label>Quantity range </label>
+                    </div>
+                    <div>
+                        <div>
+                            <span>From:</span>
+                        <input type="range" min=@QuantityList.Min() max=@QuantityList.Max() step="1" @bind="QuantityFromValue" @onclick="() => OnPageSelected(0)">
+                            <span>@QuantityFromValue</span>
+                        </div>
+                        <div>
+                            <span style="margin-right:20px">To:</span>
+                        <input type="range" min=@QuantityList.Min() max=@QuantityList.Max() step="1" @bind="QuantityToValue" @onclick="() => OnPageSelected(0)">
+                            <span>@QuantityToValue</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <div>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Transaction Id</th>
+                        <th>Transaction date</th>
+                        <th>Product Id</th>
+                        <th>Product name</th>
+                        <th>Transaction type</th>
+                        <th>Quantity</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var transactionProduct in transactionProducts)
+                    {
+                        <tr>
+                            <td>@transactionProduct.TransactionId</td>
+                            <td>@transactionProduct.TransactionDate</td>
+                            <td>@transactionProduct.ProductId</td>
+                            @foreach (var product in allProducts)
+                            {
+                                @if (product.ProductId == transactionProduct.ProductId)
+                                {
+                                    <td>@product.Name</td>
+                                }
+
+                            }
+                            <td>@transactionProduct.TransactionType</td>
+                            <td>@transactionProduct.Quantity</td>
+                        </tr>
+                    }
+                </tbody>
+
+
+            </table>
+        </div>
+          <div>
+            <div style="float:left">
+                <button @onclick="() => OnPageSelected(0)">|&lt</button>
+                <button class="button-rightAndLeft" @onclick="() => PageSelectedMinusOne()">&lt</button>
+                @foreach (int pageNumber in VisiblePageNumbers)
+                {
+
+                    @if (pageNumber == Page)
+                    {
+                        <button class="button-numbers-active">@Page</button>
+                    }
+                    else
+                    {
+                        <button class="button-numbers" @onclick="() => OnPageSelected(pageNumber)">@pageNumber</button>
+                    }
+                }
+                <button class="button-rightAndLeft" @onclick="() => PageSelectedPlusOne()">&gt</button>
+                <button @onclick="() => OnPageSelected(numberOfButtons)">&gt|</button>
+            </div>
+            <div style="float:right">
+                <p>Number of pages: @numberOfButtons</p>
+            </div>    
+          </div>
+        </div>
+        
+    </body>
+
